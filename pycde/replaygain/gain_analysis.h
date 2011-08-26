@@ -43,6 +43,8 @@ extern "C" {
 
 typedef double  Float_t;         // Type used for filtering
 
+extern const Float_t ReplayGainReferenceLoudness; /* in dB SPL */
+
 int     InitGainAnalysis ( long samplefreq );
 int     AnalyzeSamples   ( const Float_t* left_samples, const Float_t* right_samples, size_t num_samples, int num_channels );
 int		ResetSampleFrequency ( long samplefreq );

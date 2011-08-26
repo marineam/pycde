@@ -100,6 +100,8 @@ typedef signed short    Int16_t;
 typedef unsigned int    Uint32_t;
 typedef signed int      Int32_t;
 
+const Float_t ReplayGainReferenceLoudness = 89.0; /* in dB SPL */
+
 #define YULE_ORDER         10
 #define BUTTER_ORDER        2
 #define YULE_FILTER     filterYule
@@ -114,24 +116,24 @@ typedef signed int      Int32_t;
 #define MAX_SAMPLES_PER_WINDOW  (size_t) (MAX_SAMP_FREQ * RMS_WINDOW_TIME + 1)      // max. Samples per Time slice
 #define PINK_REF                64.82 //298640883795                              // calibration value
 
-Float_t          linprebuf [MAX_ORDER * 2];
-Float_t*         linpre;                                          // left input samples, with pre-buffer
-Float_t          lstepbuf  [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
-Float_t*         lstep;                                           // left "first step" (i.e. post first filter) samples
-Float_t          loutbuf   [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
-Float_t*         lout;                                            // left "out" (i.e. post second filter) samples
-Float_t          rinprebuf [MAX_ORDER * 2];
-Float_t*         rinpre;                                          // right input samples ...
-Float_t          rstepbuf  [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
-Float_t*         rstep;
-Float_t          routbuf   [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
-Float_t*         rout;
-long             sampleWindow;                                    // number of samples required to reach number of milliseconds required for RMS window
-long             totsamp;
-double           lsum;
-double           rsum;
-int              freqindex;
-int              first;
+static Float_t          linprebuf [MAX_ORDER * 2];
+static Float_t*         linpre;                                          // left input samples, with pre-buffer
+static Float_t          lstepbuf  [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
+static Float_t*         lstep;                                           // left "first step" (i.e. post first filter) samples
+static Float_t          loutbuf   [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
+static Float_t*         lout;                                            // left "out" (i.e. post second filter) samples
+static Float_t          rinprebuf [MAX_ORDER * 2];
+static Float_t*         rinpre;                                          // right input samples ...
+static Float_t          rstepbuf  [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
+static Float_t*         rstep;
+static Float_t          routbuf   [MAX_SAMPLES_PER_WINDOW + MAX_ORDER];
+static Float_t*         rout;
+static long             sampleWindow;                                    // number of samples required to reach number of milliseconds required for RMS window
+static long             totsamp;
+static double           lsum;
+static double           rsum;
+static int              freqindex;
+static int              first;
 static Uint32_t  A [(size_t)(STEPS_per_dB * MAX_dB)];
 static Uint32_t  B [(size_t)(STEPS_per_dB * MAX_dB)];
 
