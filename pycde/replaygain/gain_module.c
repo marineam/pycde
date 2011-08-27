@@ -7,6 +7,7 @@
 #include "gain_analysis.h"
 
 static PyObject *GainError;
+static Float_t album_peak;
 
 static PyObject *
 gain_clear(PyObject *self, PyObject *args)
@@ -21,6 +22,8 @@ gain_clear(PyObject *self, PyObject *args)
         return NULL;
     }
 
+    album_peak = 0.0;
+
     Py_RETURN_NONE;
 }
 
@@ -28,9 +31,9 @@ static PyObject *
 gain_track(PyObject *self, PyObject *args)
 {
     int fd, read_err, process_err;
+    Float_t track_gain, track_peak = -1.0;
     SNDFILE* handle;
     SF_INFO info;
-    Float_t title_gain;
 
     if (!PyArg_ParseTuple(args, "i", &fd))
         return NULL;
@@ -56,22 +59,36 @@ gain_track(PyObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     while (1) {
         sf_count_t frames = 1024;
-        /* Two buffers because of the API mis-match. */
-        double buf_src[frames][info.channels];
-        Float_t buf_dst[info.channels][frames];
+        short buf_src[frames][info.channels];
+        Float_t buf_dst[2][frames];
 
-        frames = sf_readf_double(handle, (double*)buf_src, frames);
+        frames = sf_readf_short(handle, (short*)buf_src, frames);
         if (frames <= 0) {
             read_err = frames;
             break;
         }
 
-        for (int f = 0; f < frames; f++)
-            for (int c = 0; c < info.channels; c++)
-                buf_dst[c][f] = buf_src[f][c];
-
-        process_err = AnalyzeSamples(buf_dst[0], buf_dst[1],
-                                     frames, info.channels);
+        /* The ReplayGain library uses Float_t for its API which is
+         * actually a double and the data stored is 16bit PCM, not
+         * floating point data... All I have to say is wow... */
+        if (info.channels >= 2) {
+            for (int f = 0; f < frames; f++) {
+                for (int c = 0; c < 2; c++) {
+                    buf_dst[c][f] = (Float_t)buf_src[f][c];
+                    if (buf_dst[c][f] > track_peak)
+                        track_peak = buf_dst[c][f];
+                }
+            }
+            process_err = AnalyzeSamples(buf_dst[0], buf_dst[1], frames, 2);
+        }
+        else {
+            for (int f = 0; f < frames; f++) {
+                buf_dst[0][f] = (Float_t)buf_src[f][0];
+                if (buf_dst[0][f] > track_peak)
+                    track_peak = buf_dst[0][f];
+            }
+            process_err = AnalyzeSamples(buf_dst[0], NULL, frames, 1);
+        }
         if (process_err != GAIN_ANALYSIS_OK)
             break;
     }
@@ -93,14 +110,18 @@ gain_track(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    title_gain = GetTitleGain();
-    if (title_gain == GAIN_NOT_ENOUGH_SAMPLES) {
+    track_gain = GetTitleGain();
+    if (track_gain == GAIN_NOT_ENOUGH_SAMPLES) {
         PyErr_SetString(GainError,
                         "Not enough samples for ReplayGain analysis");
         return NULL;
     }
 
-    return Py_BuildValue("d", (double)title_gain);
+    track_peak = track_peak / 32767.0;
+    if (track_peak > album_peak)
+        album_peak = track_peak;
+
+    return Py_BuildValue("dd", (double)track_gain, (double)track_peak);
 }
 
 static PyObject *
@@ -118,7 +139,7 @@ gain_album(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    return Py_BuildValue("d", album_gain);
+    return Py_BuildValue("dd", (double)album_gain, (double)album_peak);
 }
 
 static PyMethodDef gain_methods[] = {
