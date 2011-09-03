@@ -1,0 +1,15 @@
+#!/usr/bin/python
+
+import os
+import sys
+
+try:
+    from pycde import main
+except ImportError:
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_dir = os.path.dirname(this_dir)
+    sys.path.append(repo_dir)
+    from pycde import main
+
+if __name__ == '__main__':
+    main.main()
