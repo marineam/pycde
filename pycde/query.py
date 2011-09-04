@@ -42,14 +42,20 @@ class ReleaseInfo(dict):
 
 class Query(object):
 
-    def __init__(self, ui):
+    @classmethod
+    def add_options(cls, parser):
+        pass
+
+    def __init__(self, opt, ui):
         self.ui = ui
+        self.device = opt.device
 
-    def get_release(self, device):
-        self.ui.status('Reading %s TOC...' % device)
-        disc_info = disc.readDisc(device)
+    def get_disc(self):
+        self.ui.status('Reading %s TOC...' % self.device)
+        return disc.readDisc(self.device)
+
+    def get_release(self, disc_info):
         self.ui.status('Disc ID: %s\n' % disc_info.id)
-
         self.ui.status('Searching for release info...')
         try:
             release_info = musicbrainz.get_releases_by_discid(
@@ -70,8 +76,14 @@ class Query(object):
         releases.sort(key=self._fmt_release)
         self.ui.status("Found %s possible release(s)" % len(releases))
         chosen = self.ui.choose('Release', releases, self._fmt_release)
+        info = ReleaseInfo(disc_info.id, chosen['id'])
 
-        return ReleaseInfo(disc_info.id, chosen['id'])
+        # XXX: does the disc info include data tracks?
+        if len(info.disc['track-list']) != len(disc_info.tracks):
+            self.ui.error('Disc and metadata mismatch!')
+            raise error.Abort()
+
+        return info
 
     @staticmethod
     def _fmt_release(release):

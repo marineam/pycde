@@ -4,12 +4,9 @@ import logging
 import optparse
 import os
 import shutil
-import subprocess
-import sys
 import tempfile
-import threading
 
-from pycde import error, textui, query
+from pycde import ripper, textui
 
 
 DEFAULT_DIR = ['/data/Music/test']
@@ -33,67 +30,43 @@ def parse_args():
                       metavar='NUM', default=thread_count(),
                       help='Number of worker threads [%default]')
     parser.add_option('--debug', action='store_true')
+    #query.Query.add_options(parser)
+    ripper.Ripper.add_options(parser)
 
-    group_p = optparse.OptionGroup(parser, "CD Paranoia Options")
-    group_p.add_option('-Z', '--disable-paranoia', action='store_true')
-    parser.add_option_group(group_p)
+    opt, args = parser.parse_args()
 
-    #group_f = optparse.OptionGroup(parser, "FLAC Options")
-    #group_f.add_option('--ogg', action='store_true')
-    #parser.add_option_group(group_f)
+    if args:
+        tracks = []
+        for i in args:
+            try:
+                i = int(i)
+            except ValueError:
+                parser.error('Invalid track number: %s' % i)
+            if i < 1:
+                parser.error('Invalid track number: %s' % i)
+            tracks.append(i)
+        tracks.sort()
+    else:
+        tracks = None
 
-    return parser.parse_args()
-
-def worker(q):
-    while True:
-        task = q.get()
-        task()
-        q.task_done()
+    return opt, tracks
 
 def main():
-    opt, args = parse_args()
+    opt, tracks = parse_args()
 
     logging.basicConfig()
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG if opt.debug else logging.INFO)
 
     ui = textui.TextUI()
-    q = query.Query(ui)
+    rip = ripper.Ripper(opt, tracks, ui)
 
-    release = q.get_release(opt.device)
-
-    single_artist = release.is_single_artist()
-    if len(release['medium-list']) != 1:
-        ui.info('Disc %s' % release.disc['position'])
-
-    def fmt_ms(ms):
-        sec = int(ms) // 1000
-        return '%d:%02d' % (sec // 60, sec % 60)
-
-    for t in release.disc['track-list']:
-        r = t['recording']
-        if single_artist:
-            title = r['title']
-        else:
-            title = '%(artist-credit-phrase)s - %(title)s' % r
-
-        ui.info(' %2d. %s (%s)' %
-                (int(t['position']), title, fmt_ms(r['length'])))
-
-    ok = raw_input('OK? [Y/n] ')
-    if ok and ok[0].lower() not in ('y', 't', '1'):
-        raise error.Abort()
-
-    print 'Ripping...'
+    cwd = os.getcwd()
     tmp = tempfile.mkdtemp(prefix='pycde.')
-    paranoia = ['--disable-paranoia'] if opt.disable_paranoia else []
-    ret = subprocess.call(['cdparanoia', '-d', opt.device, '--batch']
-                          + paranoia + ['1-', 'pycde.wav'], cwd=tmp)
-    if ret != 0:
-        print 'cdparanoia exited with code %d' % ret
-        return 1
+    os.chdir(tmp)
 
-    shutil.rmtree(tmp)
-
-if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        rip.rip()
+    finally:
+        os.chdir(cwd)
+        shutil.rmtree(tmp)

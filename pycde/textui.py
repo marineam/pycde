@@ -26,3 +26,7 @@ class TextUI(object):
 
     def error(self, text):
         sys.stderr.write('%s\n' % text)
+
+    def yesno(self, prompt):
+        ok = raw_input('%s [Y/n] ' % prompt)
+        return not (ok and ok[0].lower() not in ('y', 't', '1'))

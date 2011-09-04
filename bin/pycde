@@ -4,12 +4,15 @@ import os
 import sys
 
 try:
-    from pycde import main
+    from pycde import main, error
 except ImportError:
     this_dir = os.path.dirname(os.path.abspath(__file__))
     repo_dir = os.path.dirname(this_dir)
     sys.path.append(repo_dir)
-    from pycde import main
+    from pycde import main, error
 
 if __name__ == '__main__':
-    main.main()
+    try:
+        main.main()
+    except (KeyboardInterrupt, error.Abort):
+        sys.stderr.write('Aborted\n')
