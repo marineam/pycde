@@ -22,8 +22,6 @@ class Ripper(object):
         self.opt = opt
         self.tracks = tracks
         self.metadata = None
-        self.track_gain = {}
-        self.album_gain = None
 
     def rip(self):
         self.metadata = self._get_metadata()
@@ -36,13 +34,19 @@ class Ripper(object):
 
         for track in self.tracks:
             path = self._rip_track(track)
-            gain = analyzer.analyze_track(path)
-            self.track_gain[path] = gain
+            track_gain = analyzer.analyze_track(path)
+            track_data = self.metadata.disc['track-dict'][track]
+            track_data['replaygain-track-gain'] = track_gain.gain
+            track_data['replaygain-track-peak'] = track_gain.peak
 
-        self.album_gain = analyzer.analyze_album()
+        album_gain = analyzer.analyze_album()
+        self.metadata['replaygain-album-gain'] = album_gain.gain
+        self.metadata['replaygain-album-peak'] = album_gain.peak
+        self.metadata['replaygain-reference-loudness'] = \
+                replaygain.REFERENCE_LOUDNESS
+
         import pprint
-        pprint.pprint(self.track_gain)
-        pprint.pprint(self.album_gain)
+        pprint.pprint(self.metadata)
 
     def _get_metadata(self):
         q = query.Query(self.opt, self.ui)

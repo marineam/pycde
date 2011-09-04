@@ -18,7 +18,13 @@ class ReleaseInfo(dict):
         self.release_id = release_id
         info = musicbrainz.get_release_by_id(release_id, self.include)
         super(ReleaseInfo, self).__init__(info['release'])
+
+        # Convert the list to a dict for easier access
         self.disc = self._get_disc()
+        self.disc['track-dict'] = {}
+        for t in self.disc['track-list']:
+            i = int(t['position'])
+            self.disc['track-dict'][i] = t
 
     def _get_disc(self):
         for m in self['medium-list']:
