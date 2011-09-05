@@ -67,12 +67,72 @@ class Encoder(object):
     def encode(self, track):
         Pool.mkjob(self._do_encode, track)
 
-    def tag(self, track, metadata):
-        pass
-
     def _do_encode(self, track):
         # Called in a thread to do the real work
         raise NotImplementedError()
+
+    def tag(self, track, metadata):
+        pass
+
+    def _vorbis_tags(self, track, metadata):
+        tags = []
+        def tag(name, src, *keys):
+            for key in keys:
+                src = src.get(key, {})
+            if isinstance(src, basestring):
+                tags.append((name, src))
+
+        def tag_list(src, *keys):
+            for key in keys:
+                src = src.get(key, {})
+            if isinstance(src, list):
+                return src
+            else:
+                return []
+
+        def tag_str(src, *keys):
+            for key in keys:
+                src = src.get(key, {})
+            if isinstance(src, basestring):
+                return src
+
+        track_data = metadata.disc['track-dict'][track]
+        tag('TITLE', track_data, 'recording', 'title')
+        tag('ALBUM', metadata, 'title')
+
+        tids = set()
+        for credit in tag_list(track_data, 'recording', 'artist-credit'):
+            if isinstance(credit, basestring):
+                continue
+            tag('ARTIST', credit, 'artist', 'name')
+            tids.add(tag_str(credit, 'artist', 'id'))
+
+        ids = set(tag_str(c, 'artist', 'id') for c in
+                  tag_list(metadata, 'artist-credit'))
+        if tids != ids:
+            for credit in tag_list(metadata, 'artist-credit'):
+                if isinstance(credit, basestring):
+                    continue
+                tag('ALBUMARTIST', credit, 'artist', 'name')
+
+        # Mark things as a compilation if the album artist
+        # is not listed in the track artist list.
+        # XXX: compute in the release metadata instead.
+        if not ids.issubset(tids):
+            tags.append(('COMPILATION', '1'))
+
+        tag('DATE', metadata, 'date')
+        orig = tag_str(metadata, 'release-group', 'first-release-date')
+        if orig != metadata.get('date', None):
+            tags.append(('ORIGINALDATE', orig))
+
+        tags.append(('TRACKNUMBER', track_data['position']))
+        tags.append(('TRACKTOTAL',  str(len(metadata.disc['track-dict']))))
+        if len(metadata['medium-list']) != 1:
+            tags.append(('DISCNUMBER', metadata.disc['position']))
+            tags.append(('DISCTOTAL', str(len(metadata['medium-list']))))
+
+        return tags
 
     def wait(self):
         Pool.wait()

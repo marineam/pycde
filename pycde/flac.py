@@ -18,3 +18,9 @@ class FlacEncoder(encoder.Encoder):
         if ret != 0:
             self.ui.error('flac exited with code %d' % ret)
             raise error.Abort()
+
+    def tag(self, track, metadata):
+        print
+        for tag, value in self._vorbis_tags(track, metadata):
+            print '%s=%s' % (tag, value)
+        print
