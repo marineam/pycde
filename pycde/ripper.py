@@ -5,7 +5,7 @@
 import optparse
 import subprocess
 
-from pycde import error, query, replaygain
+from pycde import error, flac, query, replaygain
 
 
 class Ripper(object):
@@ -31,13 +31,20 @@ class Ripper(object):
             raise error.Abort()
 
         analyzer = replaygain.ReplayGain()
+        encoders = [flac.FlacEncoder(self.opt, self.ui)]
 
         for track in self.tracks:
+            track_data = self.metadata.disc['track-dict'][track]
+            self.ui.status('Ripping track %02d. %s...' %
+                           (track, track_data['recording']['title']))
             path = self._rip_track(track)
             track_gain = analyzer.analyze_track(path)
-            track_data = self.metadata.disc['track-dict'][track]
             track_data['replaygain-track-gain'] = track_gain.gain
             track_data['replaygain-track-peak'] = track_gain.peak
+            self.ui.status('Encoding track %02d. %s...' %
+                           (track, track_data['recording']['title']))
+            for encoder in encoders:
+                encoder.encode(track)
 
         album_gain = analyzer.analyze_album()
         self.metadata['replaygain-album-gain'] = album_gain.gain
@@ -45,8 +52,20 @@ class Ripper(object):
         self.metadata['replaygain-reference-loudness'] = \
                 replaygain.REFERENCE_LOUDNESS
 
-        import pprint
+        self.ui.status('Waiting for encoder(s) to finish...')
+        for encoder in encoders:
+            encoder.wait()
+
+        for track in self.tracks:
+            track_data = self.metadata.disc['track-dict'][track]
+            self.ui.status('Tagging track %02d. %s...' %
+                           (track, track_data['recording']['title']))
+            for encoder in encoders:
+                encoder.tag(track, self.metadata)
+
+        import pprint, os
         pprint.pprint(self.metadata)
+        os.system("ls -la")
 
     def _get_metadata(self):
         q = query.Query(self.opt, self.ui)
